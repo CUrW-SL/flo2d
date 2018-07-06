@@ -39,7 +39,7 @@ def init_250m_run():
     today = datetime.today().strftime('%Y-%m-%d')
     input_dir = path.join(today, run_name, 'input')
     # check whether the given run-name is already taken for today.
-    if path.exists(path.join(app.root_path, 'FLO2D', 'model250m', input_dir)):
+    if path.exists(path.join(UPLOADS_DEFAULT_DEST, 'FLO2D', 'model250m', input_dir)):
         raise JsonError(status_=400, description='run-name: %s is already taken for today: %s.' % (run_name, today))
 
     req_files = request.files
