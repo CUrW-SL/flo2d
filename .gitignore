@@ -1,6 +1,7 @@
 # Custom
 .idea
 FLO2D/
+static/
 
 # setup.py installed.txt
 installed.txt
