@@ -64,7 +64,8 @@ def start_250m_run():
 
     prepare_flo2d_run(run_path, MODEL_250M_TEMPLATE_DIR, FLO2D_LIBS_DIR)
     run_flo2d_model(run_path)
-    return 'Successfully prepare model run directory'
+    return json_response(status_=200, run_id=run_id, run_status='Started',
+                         description='Successfully started model run. This will take a while to complete.')
 
 
 if __name__ == '__main__':
