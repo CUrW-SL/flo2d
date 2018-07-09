@@ -19,6 +19,8 @@ def _run_flo2d_model(run_path):
     run_model_path = path.join(run_path, 'model')
     popen_flo2d = Popen(path.join(run_model_path, 'FLOPRO.exe'), cwd=run_model_path)
 
+    # TODO update run_id in the DB with the status
+
     # wait for flo2d run completes
     popen_flo2d.communicate()
 
@@ -35,3 +37,5 @@ def _run_flo2d_model(run_path):
 
     for dat_file in dat_file_list:
         copy(dat_file, run_output_path)
+
+    # TODO update run_id in the DB with the status

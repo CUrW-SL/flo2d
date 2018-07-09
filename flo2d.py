@@ -1,10 +1,10 @@
 from datetime import datetime
-from flask import Flask, request
+from flask import Flask, request, send_from_directory
 from flask_json import FlaskJSON, JsonError, json_response
 from flask_uploads import UploadSet, configure_uploads
 from os import path
 
-from utils import is_valid_run_name, parse_run_id, prepare_flo2d_run, run_flo2d_model
+from utils import is_valid_run_name, parse_run_id, prepare_flo2d_run, run_flo2d_model, prepare_flo2d_output
 from config import UPLOADS_DEFAULT_DEST, MODEL_250M_TEMPLATE_DIR, FLO2D_LIBS_DIR
 
 app = Flask(__name__)
@@ -59,13 +59,41 @@ def start_250m_run():
         raise JsonError(status_=400, description='run-id is not specified')
 
     run_id = req_args['run-id']
-    rel_run_path = parse_run_id(run_id)
+    try:
+        rel_run_path = parse_run_id(run_id)
+    except:
+        raise JsonError(status_=400, description='Error in the given run-id: %s' % run_id)
     run_path = path.join(UPLOADS_DEFAULT_DEST, rel_run_path)
 
     prepare_flo2d_run(run_path, MODEL_250M_TEMPLATE_DIR, FLO2D_LIBS_DIR)
     run_flo2d_model(run_path)
+    # TODO update the run_id in the DB with the status
     return json_response(status_=200, run_id=run_id, run_status='Started',
                          description='Successfully started model run. This will take a while to complete.')
+
+
+@app.route('/FLO2D/250m/get-output/output.zip', methods=['GET', 'POST'])
+def get_250m_output():
+    req_args = request.args.to_dict()
+    # check whether run_id is specified and valid.
+    if 'run-id' not in req_args.keys() or not req_args['run-id']:
+        raise JsonError(status_=400, description='run-id is not specified')
+
+    run_id = req_args['run-id']
+    try:
+        rel_run_path = parse_run_id(run_id)
+    except:
+        raise JsonError(status_=400, description='Error in the given run-id: %s' % run_id)
+    run_path = path.join(UPLOADS_DEFAULT_DEST, rel_run_path)
+
+    # TODO check the DB for the status of run_id
+    # TODO if status is not finished prepare error response saying so.
+
+    output_zip = prepare_flo2d_output(run_path)
+    if not output_zip:
+        raise JsonError(status_=503, run_id=run_id, run_status='Running', description='output is not ready yet.')
+
+    return send_from_directory(directory=run_path, filename=output_zip)
 
 
 if __name__ == '__main__':
