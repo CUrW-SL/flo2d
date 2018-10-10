@@ -9,6 +9,6 @@ setup(
     author='thilinamad',
     author_email='madumalt@gamil.com',
     description='REST API for running FLO2D models at curwsl',
-    install_requires=['FLASK', 'Flask-Uploads', 'Flask-JSON'],
+    install_requires=['Flask', 'Flask-Uploads', 'Flask-JSON', 'Flask-Negotiate', 'numpy', 'pandas', 'pytz'],
     zip_safe=True
 )
