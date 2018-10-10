@@ -8,7 +8,7 @@ from .general import create_dir, get_run_date_times
 from .asci_extractor import extract_water_level_grid
 
 
-def prepare_flo2d_run(run_path, model_template_path,flo2d_lib_path):
+def prepare_flo2d_run(run_path, model_template_path, flo2d_lib_path):
     # create a directory for the model run.
     model_path = path.join(run_path, 'model')
     create_dir(model_path)
@@ -32,7 +32,7 @@ def prepare_flo2d_output(run_path):
     if path.exists(output_zip_abs_path):
         return output_zip
 
-    # Check whether the output is ready. If ready archive and return the .zip, otherwise return None.
+    # Check whether the output is ready. If ready, archive and return the .zip, otherwise return None.
     output_dir = path.join(run_path, 'output')
     if path.exists(output_dir):
         make_archive(path.join(run_path, output_base), 'zip', output_dir)
