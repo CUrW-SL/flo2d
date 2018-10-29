@@ -8,10 +8,10 @@ from flask_uploads import UploadSet, configure_uploads
 from os import path
 
 from constants import INIT_DATE_TIME_FORMAT
-from config import UPLOADS_DEFAULT_DEST, FLO2D_LIBS_DIR, MODEL_250M_TEMPLATE_DIR
+from config import UPLOADS_DEFAULT_DEST, FLO2D_LIBS_DIR, MODEL_TEMPLATE_DIR, MODEL_NAME, MODEL_RESOLUTION
 from utils import is_valid_run_name, is_valid_init_dt, parse_run_id, prepare_flo2d_run, run_flo2d_model, \
-    prepare_flo2d_output, extract_water_levels, extract_water_discharge, prepare_flo2d_waterlevel_grid_asci, \
-    prepare_flo2d_run_config, is_output_ready
+    prepare_flo2d_output, extract_channel_water_levels, extract_flood_plane_water_levels, extract_water_discharge, \
+    prepare_flo2d_waterlevel_grid_asci, prepare_flo2d_run_config, is_output_ready
 
 app = Flask(__name__)
 flask_json = FlaskJSON()
@@ -21,9 +21,9 @@ app.config['UPLOADS_DEFAULT_DEST'] = path.join(UPLOADS_DEFAULT_DEST, 'FLO2D')
 app.config['UPLOADED_FILES_ALLOW'] = 'DAT'
 
 # upload set creation
-model_250m = UploadSet('model250m', extensions='DAT')
+model_store = UploadSet(MODEL_NAME, extensions='DAT')
 
-configure_uploads(app, model_250m)
+configure_uploads(app, model_store)
 flask_json.init_app(app)
 
 
@@ -32,8 +32,8 @@ def hello_world():
     return 'Welcome to FLO2D Server!'
 
 
-@app.route('/FLO2D/250m/init-run', methods=['POST'])
-def init_250m_run():
+@app.route('/FLO2D/init-run', methods=['POST'])
+def init_run():
     req_args = request.args.to_dict()
     # Check whether run-name is specified and valid.
     if 'run-name' not in req_args.keys() or not req_args['run-name']:
@@ -59,27 +59,27 @@ def init_250m_run():
     today = datetime.today().strftime('%Y-%m-%d')
     input_dir_rel_path = path.join(today, run_name, 'input')
     # Check whether the given run-name is already taken for today.
-    input_dir_abs_path = path.join(UPLOADS_DEFAULT_DEST, 'FLO2D', 'model250m', input_dir_rel_path)
+    input_dir_abs_path = path.join(UPLOADS_DEFAULT_DEST, 'FLO2D', MODEL_NAME, input_dir_rel_path)
     if path.exists(input_dir_abs_path):
         raise JsonError(status_=400, description='run-name: %s is already taken for today: %s.' % (run_name, today))
 
     req_files = request.files
     if 'inflow' in req_files and 'outflow' in req_files and 'raincell' in req_files:
-        model_250m.save(req_files['inflow'], folder=input_dir_rel_path, name='INFLOW.DAT')
-        model_250m.save(req_files['outflow'], folder=input_dir_rel_path, name='OUTFLOW.DAT')
-        model_250m.save(req_files['raincell'], folder=input_dir_rel_path, name='RAINCELL.DAT')
+        model_store.save(req_files['inflow'], folder=input_dir_rel_path, name='INFLOW.DAT')
+        model_store.save(req_files['outflow'], folder=input_dir_rel_path, name='OUTFLOW.DAT')
+        model_store.save(req_files['raincell'], folder=input_dir_rel_path, name='RAINCELL.DAT')
     else:
         raise JsonError(status_=400, description='Missing required input files. Required inflow, outflow, raincell.')
 
     # Save run configurations.
     prepare_flo2d_run_config(input_dir_abs_path, run_name, base_dt, run_dt)
 
-    run_id = 'FLO2D:model250m:%s:%s' % (today, run_name)  # TODO save run_id in a DB with the status
+    run_id = 'FLO2D:%s:%s:%s' % (MODEL_NAME, today, run_name)  # TODO save run_id in a DB with the status
     return json_response(status_=200, run_id=run_id, description='Successfully saved files.')
 
 
-@app.route('/FLO2D/250m/start-run', methods=['GET', 'POST'])
-def start_250m_run():
+@app.route('/FLO2D/start-run', methods=['GET', 'POST'])
+def start_run():
     req_args = request.args.to_dict()
     # check whether run_id is specified and valid.
     if 'run-id' not in req_args.keys() or not req_args['run-id']:
@@ -92,15 +92,15 @@ def start_250m_run():
         raise JsonError(status_=400, description='Error in the given run-id: %s' % run_id)
     run_path = path.join(UPLOADS_DEFAULT_DEST, rel_run_path)
 
-    prepare_flo2d_run(run_path, MODEL_250M_TEMPLATE_DIR, FLO2D_LIBS_DIR)
+    prepare_flo2d_run(run_path, MODEL_TEMPLATE_DIR, FLO2D_LIBS_DIR)
     run_flo2d_model(run_path)
     # TODO update the run_id in the DB with the status
     return json_response(status_=200, run_id=run_id, run_status='Started',
                          description='Successfully started model run. This will take a while to complete.')
 
 
-@app.route('/FLO2D/250m/get-output/output.zip', methods=['GET', 'POST'])
-def get_250m_output():
+@app.route('/FLO2D/get-output/output.zip', methods=['GET', 'POST'])
+def get_output():
     req_args = request.args.to_dict()
     # check whether run_id is specified and valid.
     if 'run-id' not in req_args.keys() or not req_args['run-id']:
@@ -122,9 +122,9 @@ def get_250m_output():
     return send_from_directory(directory=run_path, filename=output_zip)
 
 
-@app.route('/FLO2D/250m/extract/water-level', methods=['POST'])
+@app.route('/FLO2D/extract/water-level', methods=['POST'])
 @consumes('application/json')
-def extract_250m_waterlevel():
+def extract_waterlevel():
     req_args = request.args.to_dict()
     # check whether run_id is specified and valid.
     if 'run-id' not in req_args.keys() or not req_args['run-id']:
@@ -140,7 +140,7 @@ def extract_250m_waterlevel():
     try:
         cell_map = request.get_json()
         channel_cell_map = cell_map['CHANNEL_CELL_MAP']
-        flood_plain_cell_map = cell_map['FLOOD_PLAIN_CELL_MAP']
+        flood_plane_cell_map = cell_map['FLOOD_PLANE_CELL_MAP'] if 'FLOOD_PLANE_CELL_MAP' in cell_map else None
     except:
         raise JsonError(status_=400, description='Invalid cell map!')
 
@@ -149,13 +149,15 @@ def extract_250m_waterlevel():
     if not is_output_ready(run_path):
         raise JsonError(status_=503, run_id=run_id, run_status='Running', description='output is not ready yet.')
 
-    channel_tms, flood_plain_tms = extract_water_levels(run_path, channel_cell_map, flood_plain_cell_map)
-    return jsonify({'CHANNELS': channel_tms, 'FLOOD_PLAIN': flood_plain_tms})
+    channel_tms = extract_channel_water_levels(run_path, channel_cell_map)
+    flood_plane_tms = extract_flood_plane_water_levels(run_path, flood_plane_cell_map) \
+        if flood_plane_cell_map is not None else {}
+    return jsonify({'CHANNELS': channel_tms, 'FLOOD_PLANE': flood_plane_tms})
 
 
-@app.route('/FLO2D/250m/extract/water-discharge', methods=['POST'])
+@app.route('/FLO2D/extract/water-discharge', methods=['POST'])
 @consumes('application/json')
-def extract_250m_waterdischarge():
+def extract_waterdischarge():
     req_args = request.args.to_dict()
     # check whether run_id is specified and valid.
     if 'run-id' not in req_args.keys() or not req_args['run-id']:
@@ -183,8 +185,8 @@ def extract_250m_waterdischarge():
     return jsonify({'CHANNELS': channel_tms})
 
 
-@app.route('/FLO2D/250m/extract/water-level-grid.zip', methods=['GET', 'POST'])
-def extract_250m_waterlevelgrid():
+@app.route('/FLO2D/extract/water-level-grid.zip', methods=['GET', 'POST'])
+def extract_waterlevelgrid():
     req_args = request.args.to_dict()
     # check whether run_id is specified and valid.
     if 'run-id' not in req_args.keys() or not req_args['run-id']:
@@ -202,7 +204,7 @@ def extract_250m_waterlevelgrid():
     if not is_output_ready(run_path):
         raise JsonError(status_=503, run_id=run_id, run_status='Running', description='output is not ready yet.')
 
-    asci_grid_zip = prepare_flo2d_waterlevel_grid_asci(run_path, 250.0)
+    asci_grid_zip = prepare_flo2d_waterlevel_grid_asci(run_path, MODEL_RESOLUTION)
     return send_from_directory(directory=run_path, filename=asci_grid_zip)
 
 

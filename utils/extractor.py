@@ -4,16 +4,23 @@ from datetime import timedelta
 from .general import get_run_date_times
 
 
-def extract_water_levels(run_path, channel_cell_map, flood_plain_map):
+def extract_channel_water_levels(run_path, channel_cell_map):
     HYCHAN_OUT_PATH = path.join(run_path, 'output', 'HYCHAN.OUT')
-    TIMDEP_OUT_PATH = path.join(run_path, 'output', 'TIMDEP.OUT')
     base_dt, run_dt = get_run_date_times(run_path)
 
     channel_tms_length = _get_timeseries_length(HYCHAN_OUT_PATH)
     channel_tms = _get_channel_timeseries(HYCHAN_OUT_PATH, 'water-level', channel_tms_length, base_dt, channel_cell_map)
-    flood_plain_tms = _get_flood_plain_timeseries(TIMDEP_OUT_PATH, base_dt, flood_plain_map)
 
-    return _change_keys(channel_cell_map, channel_tms), _change_keys(flood_plain_map, flood_plain_tms)
+    return _change_keys(channel_cell_map, channel_tms)
+
+
+def extract_flood_plane_water_levels(run_path, flood_plane_map):
+    TIMDEP_OUT_PATH = path.join(run_path, 'output', 'TIMDEP.OUT')
+    base_dt, run_dt = get_run_date_times(run_path)
+
+    flood_plane_tms = _get_flood_plain_timeseries(TIMDEP_OUT_PATH, base_dt, flood_plane_map)
+
+    return _change_keys(flood_plane_map, flood_plane_tms)
 
 
 def extract_water_discharge(run_path, channel_cell_map):
